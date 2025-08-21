@@ -20,6 +20,14 @@ const {
   runRemindersOnce,
 } = require("./manejoRecordatorios.js");
 
+// 👇 CORREGIDO: nombre del archivo y exportaciones
+const {
+  estadosRecordatorio,
+  iniciarRecordatorioGuiado,
+  manejarCallbacksRecordatorios,
+  manejarPasosRecordatorio,
+} = require("./manejoRecordatoriosCalendario.js");
+
 // === GOOGLE SHEETS ===
 function getGoogleCredentials() {
   const b64 = process.env.GOOGLE_CREDENTIALS_JSON_BASE64;
@@ -55,7 +63,7 @@ if (!TOKEN) {
 const app = express();
 app.use(express.json());
 
-// Healthcheck (Render necesita algún GET que responda 200)
+// Healthcheck
 app.get("/", (_req, res) => res.status(200).send("Bot de gastos activo ✅"));
 
 // Arranca Express siempre (webhook o polling)
@@ -87,6 +95,7 @@ if (PUBLIC_URL) {
     .then(() => console.log("✅ Usando POLLING (sin PUBLIC_URL)"))
     .catch((e) => console.error("deleteWebHook error:", e?.message || e));
 }
+
 // === CRON ===
 app.get("/run-reminders", async (req, res) => {
   const key = process.env.REMINDERS_CRON_KEY || "";
@@ -98,6 +107,7 @@ app.get("/run-reminders", async (req, res) => {
     res.status(500).send(`ERR ${e.message}`);
   }
 });
+
 // === HELP ===
 function mensajeAyuda(chatId) {
   return bot.sendMessage(
@@ -117,6 +127,7 @@ function mensajeAyuda(chatId) {
 ⏰ *Recordatorios*:
 "Recordar 2025-08-30 10:00 pagar alquiler"
 /recordatorios  (lista próximos)
+/recordar  (minicalendario)
 
 ❌ *Cancelar flujo*:
 /cancel
@@ -136,6 +147,7 @@ function detectarIntencion(texto) {
   if (t === "/gastos") return "gastos_consulta";
   if (t === "/recordatorios") return "recordatorios_listar";
   if (t === "/cancel") return "cancelar";
+  if (t === "/recordar") return "recordatorio_guiado";
 
   if (/^gaste\s+/i.test(t)) return "gasto_rapido";
   if (/^gastos(\s|$)/i.test(t)) return "gastos_consulta";
@@ -144,6 +156,16 @@ function detectarIntencion(texto) {
   return "desconocido";
 }
 
+// === CALLBACKS del minicalendario ===
+bot.on("callback_query", async (q) => {
+  try {
+    const handled = await manejarCallbacksRecordatorios(bot, q);
+    if (!handled) return;
+  } catch (e) {
+    console.error("callback_query error:", e?.message || e);
+  }
+});
+
 // === ROUTER PRINCIPAL ===
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
@@ -151,7 +173,7 @@ bot.on("message", async (msg) => {
   const intencion = detectarIntencion(texto);
 
   try {
-    // Si está en un flujo conversacional activo…
+    // Si está en flujo de GASTOS conversacional
     if (estadosConversacion[chatId]) {
       if (intencion === "cancelar") {
         delete estadosConversacion[chatId];
@@ -160,9 +182,24 @@ bot.on("message", async (msg) => {
         });
         return;
       }
-      // Continuar flujo guiado
       await manejarPasosConversacion(bot, msg, sheets, SPREADSHEET_ID);
       return;
+    }
+
+    // Si está en flujo de RECORDATORIO (después de elegir fecha/hora)
+    if (estadosRecordatorio[chatId]) {
+      if (intencion === "cancelar") {
+        delete estadosRecordatorio[chatId];
+        await bot.sendMessage(chatId, "🚫 Recordatorio cancelado.");
+        return;
+      }
+      const handled = await manejarPasosRecordatorio(
+        bot,
+        msg,
+        sheets,
+        SPREADSHEET_ID
+      );
+      if (handled) return;
     }
 
     // Ruteo por intención
@@ -189,6 +226,9 @@ bot.on("message", async (msg) => {
 
       case "recordatorios_listar":
         return listarRecordatorios(msg, sheets, SPREADSHEET_ID, bot);
+
+      case "recordatorio_guiado":
+        return iniciarRecordatorioGuiado(bot, msg);
 
       default:
         return bot.sendMessage(
