@@ -81,7 +81,7 @@ async function iniciarRecordatorioGuiado(bot, msg) {
   const now = new Date();
   estadosRecordatorio[chatId] = { paso: "cal" };
   const cal = renderCalendar(new Date(now.getFullYear(), now.getMonth(), 1));
-  await bot.sendMessage(chatId, cal.text, cal.reply_markup);
+  await bot.sendMessage(chatId, cal.text, { reply_markup: cal.reply_markup });
 }
 
 async function manejarCallbacksRecordatorios(bot, query) {
@@ -107,7 +107,7 @@ async function manejarCallbacksRecordatorios(bot, query) {
     await bot.editMessageText(cal.text, {
       chat_id: chatId,
       message_id: query.message.message_id,
-      reply_markup: cal.reply_markup.reply_markup,
+      reply_markup: cal.reply_markup,
     });
     await bot.answerCallbackQuery(query.id);
     return true;
@@ -120,7 +120,7 @@ async function manejarCallbacksRecordatorios(bot, query) {
     await bot.editMessageText(cal.text, {
       chat_id: chatId,
       message_id: query.message.message_id,
-      reply_markup: cal.reply_markup.reply_markup,
+      reply_markup: cal.reply_markup,
     });
     await bot.answerCallbackQuery(query.id);
     return true;

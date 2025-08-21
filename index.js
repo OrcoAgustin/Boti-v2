@@ -20,7 +20,6 @@ const {
   runRemindersOnce,
 } = require("./manejoRecordatorios.js");
 
-// 👇 CORREGIDO: nombre del archivo y exportaciones
 const {
   estadosRecordatorio,
   iniciarRecordatorioGuiado,
