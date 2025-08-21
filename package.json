@@ -1,0 +1,30 @@
+{
+  "name": "boti-gastos",
+  "version": "2.0.0",
+  "main": "index.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "googleapis": "^128.0.0",
+    "node-telegram-bot-api": "^0.64.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OrcoAgustin/Boti-v2.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/OrcoAgustin/Boti-v2/issues"
+  },
+  "homepage": "https://github.com/OrcoAgustin/Boti-v2#readme",
+  "description": ""
+}
