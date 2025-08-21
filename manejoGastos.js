@@ -1,27 +1,12 @@
+const {
+  leerCategoriasUsuario,
+  asegurarCategoriaUsuario,
+} = require("./manejoGastosCategorias");
+
 function normalizarMonto(s) {
   if (!s) return NaN;
-  // Acepta "1.234,56" o "1234.56" o "1234"
   const clean = s.replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
   return parseFloat(clean);
-}
-
-async function asegurarCategoria(sheets, SPREADSHEET_ID, categoria) {
-  const catResp = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: "Gastos!G2:G1000",
-  });
-  const existentes =
-    catResp.data.values?.flat().map((c) => c.toLowerCase()) || [];
-  if (!existentes.includes(categoria.toLowerCase())) {
-    const nuevaFila = existentes.length + 2;
-    const formula = `=SUMAR.SI(D:D; G${nuevaFila}; B:B)`; // opcional (dashboard global)
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `Gastos!G${nuevaFila}:H${nuevaFila}`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: [[categoria, formula]] },
-    });
-  }
 }
 
 async function manejarMensajeGastos(msg, mensaje, sheets, SPREADSHEET_ID, bot) {
@@ -54,7 +39,15 @@ async function manejarMensajeGastos(msg, mensaje, sheets, SPREADSHEET_ID, bot) {
     return;
   }
 
-  // A:F = Fecha, UserID, Usuario, Monto, Descripción, Categoría
+  // Asegurar categoría del usuario
+  await asegurarCategoriaUsuario(
+    sheets,
+    SPREADSHEET_ID,
+    userId,
+    userName,
+    categoria
+  );
+
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
     range: "Gastos!A:F",
@@ -64,7 +57,6 @@ async function manejarMensajeGastos(msg, mensaje, sheets, SPREADSHEET_ID, bot) {
     },
   });
 
-  await asegurarCategoria(sheets, SPREADSHEET_ID, categoria);
   await bot.sendMessage(
     chatId,
     `✅ Gasto registrado: $${monto.toFixed(
@@ -88,19 +80,20 @@ async function manejarConsultaGastos(
   const matchCat = t.match(/gastos (?:en|de) (.+)/i);
   const pedirTeclado = !matchCat;
 
-  // Si no especifica categoría → teclado de categorías + "Total"
   if (pedirTeclado) {
-    const catResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: "Gastos!G2:G1000",
-    });
-    const categorias =
-      catResponse.data.values?.flat().map((c) => c.trim()) || [];
+    let categorias = await leerCategoriasUsuario(
+      sheets,
+      SPREADSHEET_ID,
+      userId
+    );
     if (!categorias.length) {
-      await bot.sendMessage(chatId, "❌ No encontré categorías.");
+      await bot.sendMessage(
+        chatId,
+        "No tenés categorías todavía. Creá una con /nuevo."
+      );
       return;
     }
-    categorias.push("Total");
+    categorias = [...categorias, "Total"];
     const keyboard = categorias.map((cat) => [{ text: `Gastos en ${cat}` }]);
     await bot.sendMessage(chatId, "📊 ¿Qué categoría querés ver?", {
       reply_markup: {
@@ -119,11 +112,9 @@ async function manejarConsultaGastos(
   });
   const rows = valuesResp.data.values || [];
 
-  // Filtramos por usuario
   let total = 0;
   if (/^total$/i.test(categoriaBuscada)) {
     for (const r of rows.slice(1)) {
-      // salteá encabezados si los hay
       if (r[1] == userId) {
         const monto = parseFloat(r[3]);
         if (isFinite(monto)) total += monto;

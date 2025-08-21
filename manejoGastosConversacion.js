@@ -1,3 +1,8 @@
+const {
+  leerCategoriasUsuario,
+  asegurarCategoriaUsuario,
+} = require("./manejoGastosCategorias");
+
 const estadosConversacion = {};
 function normalizarMonto(s) {
   if (!s) return NaN;
@@ -12,29 +17,28 @@ async function iniciarNuevoGastoConversacional(
   SPREADSHEET_ID
 ) {
   const chatId = msg.chat.id;
+  const userId = msg.from.id;
 
-  // Traer categorías
-  const resp = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: "Gastos!G2:G1000",
-  });
-  const categorias =
-    resp.data.values
-      ?.flat()
-      .map((c) => c.trim())
-      .filter(Boolean) || [];
+  const categorias = await leerCategoriasUsuario(
+    sheets,
+    SPREADSHEET_ID,
+    userId
+  );
 
   if (!categorias.length) {
-    await bot.sendMessage(chatId, "❌ No encontré categorías.");
+    estadosConversacion[chatId] = {
+      paso: "cat_nueva",
+      datos: {},
+      categorias: [],
+    };
+    await bot.sendMessage(
+      chatId,
+      "❗ No tenés categorías. Escribí el nombre de tu primera categoría:"
+    );
     return;
   }
 
-  estadosConversacion[chatId] = {
-    paso: "cat",
-    datos: {},
-    categorias,
-  };
-
+  estadosConversacion[chatId] = { paso: "cat", datos: {}, categorias };
   const keyboard = categorias.map((c) => [{ text: c }]);
   keyboard.push([{ text: "➕ Nueva categoría" }]);
   await bot.sendMessage(
@@ -86,20 +90,17 @@ async function manejarPasosConversacion(bot, msg, sheets, SPREADSHEET_ID) {
 
     case "cat_nueva": {
       const nueva = texto;
-      if (!nueva || nueva.length < 2 || st.categorias.includes(nueva)) {
-        await bot.sendMessage(
-          chatId,
-          "❌ Nombre inválido o ya existe. Probá con otro."
-        );
+      if (!nueva || nueva.length < 2) {
+        await bot.sendMessage(chatId, "❌ Nombre inválido. Probá con otro.");
         return;
       }
-      const fila = st.categorias.length + 2;
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `Gastos!G${fila}`,
-        valueInputOption: "USER_ENTERED",
-        requestBody: { values: [[nueva]] },
-      });
+      await asegurarCategoriaUsuario(
+        sheets,
+        SPREADSHEET_ID,
+        userId,
+        userName,
+        nueva
+      );
       st.categorias.push(nueva);
       st.datos.categoria = nueva;
       st.paso = "desc";
