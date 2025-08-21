@@ -1,12 +1,19 @@
 require("dotenv").config();
 const TelegramBot = require("node-telegram-bot-api");
 const { google } = require("googleapis");
-const { manejarMensajeGastos } = require("./gastos");
+const {
+  manejarMensajeGastos,
+  manejarConsultaGastos,
+} = require("./manejarGastos");
 const {
   iniciarNuevoGastoConversacional,
   manejarPasosConversacion,
-  estadosConversacion, // Importamos el objeto que guarda estados
-} = require("./nuevoGastoConversacional");
+  estadosConversacion,
+} = require("./manejoGastosConversacion");
+const {
+  manejarRecordatorio,
+  listarRecordatorios,
+} = require("./manejoRecordatorios");
 
 // === GOOGLE SHEETS ===
 const credentials = require("./credentials.json");

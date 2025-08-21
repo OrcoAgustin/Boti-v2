@@ -1,0 +1,155 @@
+function normalizarMonto(s) {
+  if (!s) return NaN;
+  // Acepta "1.234,56" o "1234.56" o "1234"
+  const clean = s.replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+  return parseFloat(clean);
+}
+
+async function asegurarCategoria(sheets, SPREADSHEET_ID, categoria) {
+  const catResp = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: "Gastos!G2:G1000",
+  });
+  const existentes =
+    catResp.data.values?.flat().map((c) => c.toLowerCase()) || [];
+  if (!existentes.includes(categoria.toLowerCase())) {
+    const nuevaFila = existentes.length + 2;
+    const formula = `=SUMAR.SI(D:D; G${nuevaFila}; B:B)`; // opcional (dashboard global)
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `Gastos!G${nuevaFila}:H${nuevaFila}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [[categoria, formula]] },
+    });
+  }
+}
+
+async function manejarMensajeGastos(msg, mensaje, sheets, SPREADSHEET_ID, bot) {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const userName =
+    [msg.from.first_name, msg.from.last_name].filter(Boolean).join(" ") ||
+    msg.from.username ||
+    `${userId}`;
+  const t = mensaje.trim();
+
+  // Formato: "Gaste <monto> en <desc> / <categoria>"
+  const regex = /gaste\s+(.+?)\s+en\s+(.+?)\s*\/\s*(.+)/i;
+  const m = t.match(regex);
+  if (!m) {
+    await bot.sendMessage(
+      chatId,
+      '❌ Formato incorrecto. Usá: "Gaste 3500,50 en almuerzo / comida"'
+    );
+    return;
+  }
+
+  const fecha = new Date().toISOString().split("T")[0];
+  const monto = normalizarMonto(m[1]);
+  const descripcion = m[2].trim();
+  const categoria = m[3].trim();
+
+  if (!isFinite(monto) || monto <= 0) {
+    await bot.sendMessage(chatId, "❌ Monto inválido. Probá con 1234,56");
+    return;
+  }
+
+  // A:F = Fecha, UserID, Usuario, Monto, Descripción, Categoría
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SPREADSHEET_ID,
+    range: "Gastos!A:F",
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [[fecha, userId, userName, monto, descripcion, categoria]],
+    },
+  });
+
+  await asegurarCategoria(sheets, SPREADSHEET_ID, categoria);
+  await bot.sendMessage(
+    chatId,
+    `✅ Gasto registrado: $${monto.toFixed(
+      2
+    )} en "${descripcion}" (${categoria})`
+  );
+}
+
+// Consulta: "Gastos en <categoria>" o "Gastos total"
+async function manejarConsultaGastos(
+  msg,
+  mensaje,
+  sheets,
+  SPREADSHEET_ID,
+  bot
+) {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const t = mensaje.trim();
+
+  const matchCat = t.match(/gastos (?:en|de) (.+)/i);
+  const pedirTeclado = !matchCat;
+
+  // Si no especifica categoría → teclado de categorías + "Total"
+  if (pedirTeclado) {
+    const catResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: "Gastos!G2:G1000",
+    });
+    const categorias =
+      catResponse.data.values?.flat().map((c) => c.trim()) || [];
+    if (!categorias.length) {
+      await bot.sendMessage(chatId, "❌ No encontré categorías.");
+      return;
+    }
+    categorias.push("Total");
+    const keyboard = categorias.map((cat) => [{ text: `Gastos en ${cat}` }]);
+    await bot.sendMessage(chatId, "📊 ¿Qué categoría querés ver?", {
+      reply_markup: {
+        keyboard,
+        one_time_keyboard: true,
+        resize_keyboard: true,
+      },
+    });
+    return;
+  }
+
+  const categoriaBuscada = matchCat[1].trim();
+  const valuesResp = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: "Gastos!A:F",
+  });
+  const rows = valuesResp.data.values || [];
+
+  // Filtramos por usuario
+  let total = 0;
+  if (/^total$/i.test(categoriaBuscada)) {
+    for (const r of rows.slice(1)) {
+      // salteá encabezados si los hay
+      if (r[1] == userId) {
+        const monto = parseFloat(r[3]);
+        if (isFinite(monto)) total += monto;
+      }
+    }
+    await bot.sendMessage(chatId, `💸 Tu *total* es *$${total.toFixed(2)}*`, {
+      parse_mode: "Markdown",
+    });
+    return;
+  }
+
+  for (const r of rows.slice(1)) {
+    if (
+      r[1] == userId &&
+      (r[5] || "").toLowerCase() === categoriaBuscada.toLowerCase()
+    ) {
+      const monto = parseFloat(r[3]);
+      if (isFinite(monto)) total += monto;
+    }
+  }
+
+  await bot.sendMessage(
+    chatId,
+    `💸 Tus gastos en *${categoriaBuscada}* suman *$${total.toFixed(2)}*`,
+    { parse_mode: "Markdown" }
+  );
+}
+
+module.exports = { manejarMensajeGastos, manejarConsultaGastos };
