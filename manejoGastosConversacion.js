@@ -118,7 +118,7 @@ async function manejarPasosConversacion(bot, msg, sheets, SPREADSHEET_ID) {
       }
       st.datos.descripcion = texto;
       st.paso = "monto";
-      await bot.sendMessage(chatId, "💸 ¿Cuánto gastaste? (admite 1234,56)");
+      await bot.sendMessage(chatId, "💸 ¿Cuánto gastaste?");
       break;
     }
 
@@ -173,7 +173,7 @@ async function manejarPasosConversacion(bot, msg, sheets, SPREADSHEET_ID) {
         return;
       }
       if (/^❌ Cancelar$/.test(texto)) {
-        await bot.sendMessage(chatId, "🚫 Flujo cancelado.", {
+        await bot.sendMessage(chatId, "🚫 Gasto cancelado.", {
           reply_markup: { remove_keyboard: true },
         });
         delete estadosConversacion[chatId];

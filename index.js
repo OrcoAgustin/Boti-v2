@@ -13,9 +13,11 @@ const {
   manejarPasosConversacion,
   estadosConversacion,
 } = require("./manejoGastosConversacion.js");
+
 const {
   manejarRecordatorio,
   listarRecordatorios,
+  runRemindersOnce,
 } = require("./manejoRecordatorios.js");
 
 // === GOOGLE SHEETS ===
@@ -85,7 +87,17 @@ if (PUBLIC_URL) {
     .then(() => console.log("✅ Usando POLLING (sin PUBLIC_URL)"))
     .catch((e) => console.error("deleteWebHook error:", e?.message || e));
 }
-
+// === CRON ===
+app.get("/run-reminders", async (req, res) => {
+  const key = process.env.REMINDERS_CRON_KEY || "";
+  if (key && req.query.key !== key) return res.status(403).send("forbidden");
+  try {
+    const n = await runRemindersOnce(bot, sheets, SPREADSHEET_ID);
+    res.status(200).send(`OK ${n}`);
+  } catch (e) {
+    res.status(500).send(`ERR ${e.message}`);
+  }
+});
 // === HELP ===
 function mensajeAyuda(chatId) {
   return bot.sendMessage(
