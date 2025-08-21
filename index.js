@@ -1,6 +1,9 @@
 require("dotenv").config();
 const TelegramBot = require("node-telegram-bot-api");
+const express = require("express");
 const { google } = require("googleapis");
+
+// === HANDLERS ===
 const {
   manejarMensajeGastos,
   manejarConsultaGastos,
@@ -16,35 +19,72 @@ const {
 } = require("./manejoRecordatorios.js");
 
 // === GOOGLE SHEETS ===
-const credentials = require("./credentials.json");
+function getGoogleCredentials() {
+  const b64 = process.env.GOOGLE_CREDENTIALS_JSON_BASE64;
+  const raw = process.env.GOOGLE_CREDENTIALS_JSON;
+  if (b64) return JSON.parse(Buffer.from(b64, "base64").toString("utf8"));
+  if (raw) return JSON.parse(raw);
+  try {
+    return require("./credentials.json");
+  } catch {
+    throw new Error(
+      "No Google credentials found. Set GOOGLE_CREDENTIALS_JSON or GOOGLE_CREDENTIALS_JSON_BASE64."
+    );
+  }
+}
+
+const credentials = getGoogleCredentials();
 const auth = new google.auth.GoogleAuth({
   credentials,
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
 });
 const sheets = google.sheets({ version: "v4", auth });
-const SPREADSHEET_ID = "1o1X0CUdi3FaOM0LqhqCGmltnlIzJOHWITaqslCBP6MI";
+const SPREADSHEET_ID =
+  process.env.SPREADSHEET_ID || "1o1X0CUdi3FaOM0LqhqCGmltnlIzJOHWITaqslCBP6MI";
 
-// === TELEGRAM BOT ===
-const express = require("express");
+// === TELEGRAM BOT + SERVER ===
+const TOKEN = process.env.TELEGRAM_TOKEN || "";
+const PUBLIC_URL = (process.env.PUBLIC_URL || "").trim();
+
+if (!TOKEN) {
+  throw new Error("TELEGRAM_TOKEN no configurado en variables de entorno.");
+}
+
 const app = express();
-
-const bot = new TelegramBot(process.env.TELEGRAM_TOKEN);
-bot.setWebHook(`${process.env.PUBLIC_URL}/bot${process.env.TELEGRAM_TOKEN}`);
-
 app.use(express.json());
 
-app.post(`/bot${process.env.TELEGRAM_TOKEN}`, (req, res) => {
-  bot.processUpdate(req.body);
-  res.sendStatus(200);
-});
+// Healthcheck (Render necesita algún GET que responda 200)
+app.get("/", (_req, res) => res.status(200).send("Bot de gastos activo ✅"));
 
-app.get("/", (req, res) => {
-  res.send("Bot de gastos activo ✅");
-});
+// Arranca Express siempre (webhook o polling)
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🌐 Express escuchando en puerto ${PORT}`));
 
-app.listen(process.env.PORT || 3000, () => {
-  console.log("Servidor express escuchando");
-});
+let bot;
+
+if (PUBLIC_URL) {
+  // === MODO WEBHOOK (prod) ===
+  bot = new TelegramBot(TOKEN);
+  const webhookPath = `/bot${TOKEN}`;
+  const webhookUrl = `${PUBLIC_URL}${webhookPath}`;
+
+  bot
+    .setWebHook(webhookUrl)
+    .then(() => console.log("✅ Webhook configurado:", webhookUrl))
+    .catch((e) => console.error("setWebHook error:", e?.message || e));
+
+  app.post(webhookPath, (req, res) => {
+    bot.processUpdate(req.body);
+    res.sendStatus(200);
+  });
+} else {
+  // === MODO POLLING (dev) ===
+  bot = new TelegramBot(TOKEN, { polling: true });
+  bot
+    .deleteWebHook({ drop_pending_updates: false })
+    .then(() => console.log("✅ Usando POLLING (sin PUBLIC_URL)"))
+    .catch((e) => console.error("deleteWebHook error:", e?.message || e));
+}
 
 // === HELP ===
 function mensajeAyuda(chatId) {
