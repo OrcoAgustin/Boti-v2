@@ -4,16 +4,16 @@ const { google } = require("googleapis");
 const {
   manejarMensajeGastos,
   manejarConsultaGastos,
-} = require("./manejarGastos");
+} = require("./manejoGastos.js");
 const {
   iniciarNuevoGastoConversacional,
   manejarPasosConversacion,
   estadosConversacion,
-} = require("./manejoGastosConversacion");
+} = require("./manejoGastosConversacion.js");
 const {
   manejarRecordatorio,
   listarRecordatorios,
-} = require("./manejoRecordatorios");
+} = require("./manejoRecordatorios.js");
 
 // === GOOGLE SHEETS ===
 const credentials = require("./credentials.json");
