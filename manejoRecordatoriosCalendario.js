@@ -5,9 +5,14 @@ const {
 
 const estadosRecordatorio = {}; // por chatId: { paso, fecha, hora }
 
+function isValidHHMM(s) {
+  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(String(s || "").trim());
+}
+
 function two(n) {
   return String(n).padStart(2, "0");
 }
+
 function monthLabel(d) {
   const m = d.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
   return m[0].toUpperCase() + m.slice(1);
@@ -64,6 +69,7 @@ function timeKeyboard(fecha) {
   const quick = ["08:00", "09:00", "12:00", "18:00", "20:00"];
   const rows = [
     quick.map((t) => ({ text: t, callback_data: `rmd|time|${t}` })),
+    [{ text: "🕓 Elegir otro horario", callback_data: "rmd|time_custom" }],
     [{ text: "⏱ Sin hora (09:00)", callback_data: "rmd|time|" }],
     [{ text: "↩︎ Cambiar fecha", callback_data: "rmd|changeDate" }],
   ];
@@ -92,6 +98,19 @@ async function manejarCallbacksRecordatorios(bot, query) {
   const st = (estadosRecordatorio[chatId] ||= { paso: "cal" });
   const parts = data.split("|");
 
+  if (parts[1] === "time_custom") {
+    st.paso = "time_custom";
+    await bot.sendMessage(
+      chatId,
+      "⌨️ Escribí la hora en formato *HH:MM* (24h), ej: 08:30",
+      {
+        parse_mode: "Markdown",
+        reply_markup: { force_reply: true, selective: true },
+      }
+    );
+    await bot.answerCallbackQuery(query.id);
+    return true;
+  }
   if (parts[1] === "nav") {
     let y = Number(parts[2]);
     let mm = Number(parts[3]);
@@ -166,7 +185,7 @@ async function manejarCallbacksRecordatorios(bot, query) {
 async function manejarPasosRecordatorio(bot, msg, sheets, SPREADSHEET_ID) {
   const chatId = msg.chat.id;
   const st = estadosRecordatorio[chatId];
-  if (!st || st.paso !== "text") return false;
+  if (!st || (st.paso !== "text" && st.paso !== "time_custom")) return false;
 
   const userId = msg.from.id;
   const userName =
@@ -174,6 +193,25 @@ async function manejarPasosRecordatorio(bot, msg, sheets, SPREADSHEET_ID) {
     msg.from.username ||
     `${userId}`;
   const texto = (msg.text || "").trim();
+
+  // si el usuario está ingresando su propia hora
+  if (st.paso === "time_custom") {
+    const input = (msg.text || "").trim();
+    if (!isValidHHMM(input)) {
+      await bot.sendMessage(
+        chatId,
+        "❌ Hora inválida. Usá formato HH:MM, ej: 08:30"
+      );
+      return true; // sigue esperando una hora válida
+    }
+    st.hora = input;
+    st.paso = "text";
+    await bot.sendMessage(chatId, "📝 ¿Qué te tengo que recordar?", {
+      reply_markup: { force_reply: true, selective: true },
+    });
+    return true;
+  }
+
   if (!texto) {
     await bot.sendMessage(chatId, "❌ Texto vacío. Decime qué recordarte.");
     return true;
