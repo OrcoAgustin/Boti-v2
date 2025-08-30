@@ -125,7 +125,7 @@ function mensajeAyuda(chatId) {
 
 ⏭ *Cierre de mes*:
 /cambiarmes            (mueve mes anterior)
-/cambiarmes hoy        (mueve todo lo previo a hoy)
+/cambiarmeshoy        (mueve todo lo previo a hoy)
 
 ⏰ *Recordatorios*:
 "Recordar 2025-08-30 10:00 pagar alquiler"
@@ -151,7 +151,9 @@ function detectarIntencion(texto) {
   if (t === "/recordatorios") return "recordatorios_listar";
   if (t === "/cancel") return "cancelar";
   if (t === "/recordar") return "recordatorio_guiado";
-  if (t === "/cambiarmes" || t.startsWith("/cambiarmes ")) return "cambiar_mes";
+  if (t === "/cambiarmes") return "cambiar_mes";
+  if (t === "/cambiarmeshoy") return "cambiar_mes_hoy";
+
   if (/^gaste\s+/i.test(t)) return "gasto_rapido";
   if (/^gastos(\s|$)/i.test(t)) return "gastos_consulta";
   if (/^recordar\s+/i.test(t)) return "recordatorio_alta";
@@ -211,9 +213,11 @@ bot.on("message", async (msg) => {
         return mensajeAyuda(chatId);
 
       case "cambiar_mes": {
-        // puede venir con argumento: "/cambiarmes hoy"
-        const args = texto.slice("/cambiarmes".length).trim(); // "" o "hoy"
         return cambiarMes(msg, sheets, SPREADSHEET_ID, bot, args);
+      }
+
+      case "cambiar_mes_hoy": {
+        return cambiarMes(msg, sheets, SPREADSHEET_ID, bot, "hoy");
       }
 
       case "gasto_conversacional":
