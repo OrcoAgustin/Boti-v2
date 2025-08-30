@@ -8,11 +8,14 @@ const {
   manejarMensajeGastos,
   manejarConsultaGastos,
 } = require("./manejoGastos.js");
+
 const {
   iniciarNuevoGastoConversacional,
   manejarPasosConversacion,
   estadosConversacion,
 } = require("./manejoGastosConversacion.js");
+
+const { cambiarMes } = require("./manejoHistorico.js");
 
 const {
   manejarRecordatorio,
@@ -114,14 +117,15 @@ function mensajeAyuda(chatId) {
     `
 📌 *Comandos*
 
-💸 *Gasto rápido*:
-"Gaste 3500 en almuerzo / comida"
-
 🧭 *Gasto guiado*:
 /nuevo  (con botones)
 
 📊 *Consultar*:
 "Gastos en comida"  |  "Gastos total"  |  /gastos
+
+⏭ *Cierre de mes*:
+/cambiarmes            (mueve mes anterior)
+/cambiarmes hoy        (mueve todo lo previo a hoy)
 
 ⏰ *Recordatorios*:
 "Recordar 2025-08-30 10:00 pagar alquiler"
@@ -147,7 +151,7 @@ function detectarIntencion(texto) {
   if (t === "/recordatorios") return "recordatorios_listar";
   if (t === "/cancel") return "cancelar";
   if (t === "/recordar") return "recordatorio_guiado";
-
+  if (t === "/cambiarmes" || t.startsWith("/cambiarmes ")) return "cambiar_mes";
   if (/^gaste\s+/i.test(t)) return "gasto_rapido";
   if (/^gastos(\s|$)/i.test(t)) return "gastos_consulta";
   if (/^recordar\s+/i.test(t)) return "recordatorio_alta";
@@ -205,6 +209,12 @@ bot.on("message", async (msg) => {
     switch (intencion) {
       case "ayuda":
         return mensajeAyuda(chatId);
+
+      case "cambiar_mes": {
+        // puede venir con argumento: "/cambiarmes hoy"
+        const args = texto.slice("/cambiarmes".length).trim(); // "" o "hoy"
+        return cambiarMes(msg, sheets, SPREADSHEET_ID, bot, args);
+      }
 
       case "gasto_conversacional":
         return iniciarNuevoGastoConversacional(
