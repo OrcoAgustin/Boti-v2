@@ -118,19 +118,18 @@ function mensajeAyuda(chatId) {
 📌 *Comandos*
 
 🧭 *Gasto guiado*:
-/nuevo  (con botones)
+/nuevo  (registrar gastos)
 
 📊 *Consultar*:
-"Gastos en comida"  |  "Gastos total"  |  /gastos
+/gastos (ver gastos en una categoria)
 
 ⏭ *Cierre de mes*:
-/cambiarmes            (mueve mes anterior)
-/cambiarmeshoy        (mueve todo lo previo a hoy)
+/cambiarmes  (mueve mes anterior)
+/cambiarmeshoy  (mueve todo lo previo a hoy)
 
 ⏰ *Recordatorios*:
-"Recordar 2025-08-30 10:00 pagar alquiler"
-/recordatorios  (lista próximos)
-/recordar  (minicalendario)
+/recordar  (registra un evento)
+/recordatorios  (lista próximos eventos)
 
 ❌ *Cancelar flujo*:
 /cancel
