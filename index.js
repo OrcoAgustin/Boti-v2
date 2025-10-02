@@ -261,3 +261,4 @@ bot.on("message", async (msg) => {
 });
 
 console.log("🤖 Bot v2 iniciado");
+//ver grafs

@@ -143,32 +143,43 @@ async function manejarConsultaGastos(
   );
 }
 // obtenerUltimosGastos.js
-async function obtenerUltimosGastos(sheets, SPREADSHEET_ID, limite = 5) {
+async function obtenerUltimosGastos(
+  msg,
+  sheets,
+  SPREADSHEET_ID,
+  bot,
+  limite = 5
+) {
+  const chatId = msg.chat.id;
+
   try {
-    // Leemos las columnas A-D (fecha, monto, descripción, categoría)
-    const response = await sheets.spreadsheets.values.get({
+    // Traigo todas las filas de la hoja "Gastos"
+    const res = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: "Gastos!A:D",
+      range: "Gastos!A:D", // Fecha | Monto | Descripción | Categoría
     });
 
-    const rows = response.data.values || [];
-    if (rows.length <= 1) return []; // no hay datos (solo headers)
+    const rows = res.data.values || [];
+    if (rows.length <= 1) {
+      return bot.sendMessage(chatId, "⚠️ No hay gastos registrados todavía.");
+    }
 
-    // Sacamos el header
-    const data = rows.slice(1);
+    const data = rows.slice(1); // saco los headers
+    const ultimos = data.slice(-limite).reverse(); // últimos n gastos
 
-    // Tomamos los últimos `limite` gastos
-    const ultimos = data.slice(-limite).reverse();
+    let respuesta = "📋 *Últimos gastos registrados:*\n\n";
+    ultimos.forEach(([fecha, monto, descripcion, categoria], i) => {
+      respuesta += `#${i + 1} — ${fecha || "📅 sin fecha"}\n💸 $${
+        monto || "0"
+      } en *${descripcion || "sin desc."}* _(categoría: ${
+        categoria || "sin cat."
+      })_\n\n`;
+    });
 
-    return ultimos.map(([fecha, monto, descripcion, categoria]) => ({
-      fecha,
-      monto,
-      descripcion,
-      categoria,
-    }));
-  } catch (err) {
-    console.error("❌ Error al obtener últimos gastos:", err);
-    throw err;
+    return bot.sendMessage(chatId, respuesta, { parse_mode: "Markdown" });
+  } catch (e) {
+    console.error("❌ Error en obtenerUltimosGastos:", e);
+    return bot.sendMessage(chatId, "❌ Error al obtener los últimos gastos.");
   }
 }
 
