@@ -151,12 +151,13 @@ async function obtenerUltimosGastos(
   limite = 5
 ) {
   const chatId = msg.chat.id;
+  const userId = String(chatId); // usamos el chat.id como identificador
 
   try {
     // Traigo todas las filas de la hoja "Gastos"
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: "Gastos!A:D", // Fecha | Monto | Descripción | Categoría
+      range: "Gastos!A:F",
     });
 
     const rows = res.data.values || [];
@@ -164,14 +165,21 @@ async function obtenerUltimosGastos(
       return bot.sendMessage(chatId, "⚠️ No hay gastos registrados todavía.");
     }
 
-    const data = rows.slice(1); // saco los headers
-    const ultimos = data.slice(-limite).reverse(); // últimos n gastos
+    const data = rows.slice(1); // saco encabezado
+    // Filtrar solo los gastos del usuario
+    const gastosUsuario = data.filter((fila) => fila[1] === userId);
 
-    let respuesta = "📋 *Últimos gastos registrados:*\n\n";
-    ultimos.forEach(([fecha, monto, descripcion, categoria], i) => {
+    if (gastosUsuario.length === 0) {
+      return bot.sendMessage(chatId, "📭 Todavía no registraste gastos.");
+    }
+
+    const ultimos = gastosUsuario.slice(-limite).reverse();
+
+    let respuesta = "📋 *Tus últimos gastos registrados:*\n\n";
+    ultimos.forEach(([fecha, , usuario, monto, descripcion, categoria], i) => {
       respuesta += `#${i + 1} — ${fecha || "📅 sin fecha"}\n💸 $${
         monto || "0"
-      } en *${descripcion || "sin desc."}* _(categoría: ${
+      } en *${descripcion || "sin desc."}* _(cat: ${
         categoria || "sin cat."
       })_\n\n`;
     });
@@ -179,7 +187,7 @@ async function obtenerUltimosGastos(
     return bot.sendMessage(chatId, respuesta, { parse_mode: "Markdown" });
   } catch (e) {
     console.error("❌ Error en obtenerUltimosGastos:", e);
-    return bot.sendMessage(chatId, "❌ Error al obtener los últimos gastos.");
+    return bot.sendMessage(chatId, "❌ Error al obtener tus últimos gastos.");
   }
 }
 
