@@ -142,5 +142,38 @@ async function manejarConsultaGastos(
     { parse_mode: "Markdown" }
   );
 }
+// obtenerUltimosGastos.js
+async function obtenerUltimosGastos(sheets, SPREADSHEET_ID, limite = 5) {
+  try {
+    // Leemos las columnas A-D (fecha, monto, descripción, categoría)
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: "Gastos!A:D",
+    });
 
-module.exports = { manejarMensajeGastos, manejarConsultaGastos };
+    const rows = response.data.values || [];
+    if (rows.length <= 1) return []; // no hay datos (solo headers)
+
+    // Sacamos el header
+    const data = rows.slice(1);
+
+    // Tomamos los últimos `limite` gastos
+    const ultimos = data.slice(-limite).reverse();
+
+    return ultimos.map(([fecha, monto, descripcion, categoria]) => ({
+      fecha,
+      monto,
+      descripcion,
+      categoria,
+    }));
+  } catch (err) {
+    console.error("❌ Error al obtener últimos gastos:", err);
+    throw err;
+  }
+}
+
+module.exports = {
+  manejarMensajeGastos,
+  manejarConsultaGastos,
+  obtenerUltimosGastos,
+};

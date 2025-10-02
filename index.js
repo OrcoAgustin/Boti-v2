@@ -7,6 +7,7 @@ const { google } = require("googleapis");
 const {
   manejarMensajeGastos,
   manejarConsultaGastos,
+  obtenerUltimosGastos,
 } = require("./manejoGastos.js");
 
 const {
@@ -122,10 +123,11 @@ function mensajeAyuda(chatId) {
 
 📊 *Consultar*:
 /gastos (ver gastos en una categoria)
+/ultimos (ver últimos gastos)
 
 ⏭ *Cierre de mes*:
-/cambiarmes  (mueve mes anterior)
-/cambiarmeshoy  (mueve todo lo previo a hoy)
+/cambiarmes  (mueve todos los gastos del mes anterior al historico)
+/cambiarmeshoy  (mueve todos los gastos previos a hoy al historico)
 
 ⏰ *Recordatorios*:
 /recordar  (registra un evento)
@@ -146,6 +148,7 @@ function detectarIntencion(texto) {
   if (t.startsWith("/start") || t.toLowerCase().startsWith("ayuda"))
     return "ayuda";
   if (t === "/nuevo") return "gasto_conversacional";
+  if (t === "/ultimos") return "gastos_ultimos";
   if (t === "/gastos") return "gastos_consulta";
   if (t === "/recordatorios") return "recordatorios_listar";
   if (t === "/cancel") return "cancelar";
@@ -229,6 +232,9 @@ bot.on("message", async (msg) => {
 
       case "gasto_rapido":
         return manejarMensajeGastos(msg, texto, sheets, SPREADSHEET_ID, bot);
+
+      case "gastos_ultimos":
+        return obtenerUltimosGastos(msg, sheets, SPREADSHEET_ID, bot, 5);
 
       case "gastos_consulta":
         return manejarConsultaGastos(msg, texto, sheets, SPREADSHEET_ID, bot);
